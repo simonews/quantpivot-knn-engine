@@ -1,8 +1,10 @@
 #ifndef QUANTPIVOT_COMMON
 #define QUANTPIVOT_COMMON
 
-#define	type	double
-#define	align	32
+#include <stdint.h>
+
+#define	type double
+#define	align 32
 
 #define	MATRIX		type*
 #define	VECTOR		type*
@@ -15,6 +17,12 @@ typedef struct{
 	MATRIX Q;					// query
 	int* id_nn;					// per ogni query point gli ID dei K-NN
 	MATRIX dist_nn;				// per ogni query point le distanze dai K-NN
+
+	// ADDED after christian's version
+	uint8_t* DS_quantized_plus; 
+	uint8_t* DS_quantized_minus; 
+
+
 	int h;						// numero di pivot
 	int k;						// numero di vicini
 	int x;						// parametro x per la quantizzazione
