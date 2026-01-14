@@ -1,110 +1,82 @@
-%include "sseutils64.nasm"
+; ============================================================================
+; quantpivot64.nasm - Implementazione AVX 64-bit di euclidean_distance (FIXED)
+; ============================================================================
+; BUG FIX: I residui scalari vengono ora accumulati in un registro separato
+; e sommati al totale PRIMA della riduzione orizzontale
+; ============================================================================
 
 default rel
 
-section .data			; Sezione contenente dati inizializzati
+section .text
+global euclidean_distance_asm
 
-input		equ		8
-msg			db	'nq:',32,0
-nl			db	10,0
+euclidean_distance_asm:
+    ; Inizializza accumulatore vettoriale a zero
+    vxorpd ymm0, ymm0, ymm0        ; ymm0 = [0.0, 0.0, 0.0, 0.0] (somma vettoriale)
+    vxorpd xmm2, xmm2, xmm2        ; xmm2 = 0.0 (somma scalare residui)
+    
+    ; Calcola numero di iterazioni vettoriali (D / 4)
+    mov eax, edx                    ; eax = D
+    shr eax, 2                      ; eax = D / 4
+    jz .residual                    ; Se D < 4, salta al residuo
 
+.vector_loop:
+    ; Carica 4 double da v e w (32 byte)
+    vmovupd ymm1, [rdi]             ; ymm1 = v[i..i+3]
+    vmovupd ymm3, [rsi]             ; ymm3 = w[i..i+3]
+    
+    ; Calcola differenza
+    vsubpd ymm1, ymm1, ymm3         ; ymm1 = v[i..i+3] - w[i..i+3]
+    
+    ; Eleva al quadrato
+    vmulpd ymm1, ymm1, ymm1         ; ymm1 = diff²
+    
+    ; Accumula
+    vaddpd ymm0, ymm0, ymm1         ; ymm0 += diff²
+    
+    ; Avanza puntatori
+    add rdi, 32
+    add rsi, 32
+    
+    ; Decrementa e ripeti
+    dec eax
+    jnz .vector_loop
 
-section .bss			; Sezione contenente dati non inizializzati
-	alignb 16
-	nq		resd		1
+.residual:
+    ; Gestisci elementi residui (D mod 4)
+    mov eax, edx                    ; eax = D
+    and eax, 3                      ; eax = D mod 4
+    jz .horizontal_sum              ; Se nessun residuo, vai alla somma
 
-section .text			; Sezione contenente il codice macchina
+.residual_loop:
+    ; Processa 1 double alla volta (scalare)
+    vmovsd xmm1, [rdi]              ; xmm1 = v[i]
+    vmovsd xmm3, [rsi]              ; xmm3 = w[i]
+    
+    vsubsd xmm1, xmm1, xmm3         ; xmm1 = v[i] - w[i]
+    vmulsd xmm1, xmm1, xmm1         ; xmm1 = (v[i] - w[i])²
+    vaddsd xmm2, xmm2, xmm1         ; xmm2 += (v[i] - w[i])² (ACCUMULA IN XMM2!)
+    
+    ; Avanza puntatori
+    add rdi, 8
+    add rsi, 8
+    
+    ; Decrementa e ripeti
+    dec eax
+    jnz .residual_loop
 
-
-; ----------------------------------------------------------
-; macro per l'allocazione dinamica della memoria
-;
-;	getmem	<size>,<elements>
-;
-; alloca un'area di memoria di <size>*<elements> bytes
-; (allineata a 16 bytes) e restituisce in EAX
-; l'indirizzo del primo bytes del blocco allocato
-; (funziona mediante chiamata a funzione C, per cui
-; altri registri potrebbero essere modificati)
-;
-;	fremem	<address>
-;
-; dealloca l'area di memoria che ha inizio dall'indirizzo
-; <address> precedentemente allocata con getmem
-; (funziona mediante chiamata a funzione C, per cui
-; altri registri potrebbero essere modificati)
-
-extern get_block
-extern free_block
-
-%macro	getmem	2
-	mov	eax, %1
-	push	eax
-	mov	eax, %2
-	push	eax
-	call	get_block wrt ..plt    ; Per PIC
-	add	esp, 8
-%endmacro
-
-%macro	fremem	1
-	push	%1
-	call	free_block wrt ..plt    ; Per PIC
-	add	esp, 4
-%endmacro
-
-; ------------------------------------------------------------
-; Funzioni
-; ------------------------------------------------------------
-
-global prova
-
-
-prova:
-		; ------------------------------------------------------------
-		; Sequenza di ingresso nella funzione
-		; ------------------------------------------------------------
-		push		rbp		; salva il Base Pointer
-		mov		rbp, rsp	; il Base Pointer punta al Record di Attivazione corrente
-		push		rbx		; salva i registri da preservare
-		push		rsi
-		push		rdi
-		; ------------------------------------------------------------
-		; legge i parametri dal Record di Attivazione corrente
-		; ------------------------------------------------------------
-
-		; elaborazione
-		; [RDI] input->DS; 			// dataset
-		; [RDI+8]input->P;			// vettore contenente gli indici dei pivot
-		; [RDI+16]input->index;		// indice
-		; [RDI+24]input->Q;			// query
-		; [RDI+32]input->id_nn;		// per ogni query point gli ID dei K-NN
-		; [RDI+40]input->dist_nn;	// per ogni query point le distanze dai K-NN
-		; [RDI+48]input->h;			// numero di pivot
-		; [RDI+52]input->k;			// numero di vicini
-		; [RDI+56]input->x;			// parametro x per la quantizzazione
-		; [RDI+60]input->N;			// numero di righe del dataset
-		; [RDI+64]input->D;			// numero di colonne/feature del dataset
-		; [RDI+68]input->nq;		// numero delle query
-		; [RDI+72]input->silent;	// modalità silenziosa
-
-		; STAMPA IL PARAMETRO nq
-		VMOVSS XMM0, [RDI+68]
-		VMOVSS [nq], XMM0
-		prints msg
-		printsi nq
-		prints nl
-
-		; SALVA 7 COME PRIMO INDICE DEI VICINI
-		MOV RAX, [RDI+32] ; indirizzo di id_nn
-		mov [RAX], dword 15
-
-		; ------------------------------------------------------------
-		; Sequenza di uscita dalla funzione
-		; ------------------------------------------------------------
-
-		pop	rdi		; ripristina i registri da preservare
-		pop	rsi
-		pop	rbx
-		mov	rsp, rbp	; ripristina lo Stack Pointer
-		pop	rbp		; ripristina il Base Pointer
-		ret			; torna alla funzione C chiamante
+.horizontal_sum:
+    ; Somma orizzontale dei 4 double in YMM0
+    vextractf128 xmm1, ymm0, 1      ; xmm1 = [c, d] (parte alta)
+    vaddpd xmm0, xmm0, xmm1         ; xmm0 = [a+c, b+d]
+    vhaddpd xmm0, xmm0, xmm0        ; xmm0 = [a+b+c+d, a+b+c+d]
+    
+    ; ✅ FIX: Aggiungi la somma scalare dei residui
+    vaddsd xmm0, xmm0, xmm2         ; xmm0 += somma_residui
+    
+    ; Calcola radice quadrata
+    vsqrtsd xmm0, xmm0, xmm0        ; xmm0 = sqrt(sum)
+    
+    ; Cleanup
+    vzeroupper
+    ret

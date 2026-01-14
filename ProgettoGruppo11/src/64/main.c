@@ -146,6 +146,7 @@ int main(int argc, char** argv) {
 	printf("Query caricate: nq=%d, D=%d\n", input->nq, input->D); //added
 
 
+
 	clock_t t;
 	float time;
 

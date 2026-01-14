@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <math.h>
 
 #include <time.h>
 
@@ -98,7 +100,7 @@ int main(int argc, char** argv) {
 	input->DS = load_data(dsfilename, &input->N, &input->D);
 	input->Q = load_data(queryfilename, &input->nq, &input->D);
 	
-	//nput->nq = 10; //TEST: solo 10 query 
+	//input->nq = 10; //TEST: solo 10 query 
 	//printf("ATTENZIONE: numero query ridotto per test\n");
 	
 	input->id_nn = _mm_malloc(input->nq*input->k*sizeof(int), align);
@@ -113,6 +115,50 @@ int main(int argc, char** argv) {
 	printf("Dataset caricato: N=%d, D=%d\n", input->N, input->D);
 	printf("Query caricate: nq=%d, D=%d\n", input->nq, input->D);
 
+	// ============================================================================
+	// TEST ASSEMBLY vs C
+	// ============================================================================
+	printf("\n===== TEST ASSEMBLY vs C =====\n");
+
+	// Test 1: Vettori identici (distanza = 0)
+	{
+		type v[256], w[256];
+		for (int i = 0; i < 256; i++) {
+			v[i] = 1.5f;
+			w[i] = 1.5f;
+		}
+		type dist_c = euclidean_distance_c(v, w, 256);
+		type dist_asm = euclidean_distance_asm(v, w, 256);
+		printf("Test 1 (identici): C=%.9f, ASM=%.9f, diff=%.9e\n", 
+		       dist_c, dist_asm, fabs(dist_c - dist_asm));
+	}
+
+	// Test 2: Vettori con differenza costante
+	{
+		type v[256], w[256];
+		for (int i = 0; i < 256; i++) {
+			v[i] = 2.0f;
+			w[i] = 1.0f;
+		}
+		type dist_c = euclidean_distance_c(v, w, 256);
+		type dist_asm = euclidean_distance_asm(v, w, 256);
+		printf("Test 2 (diff=1): C=%.9f, ASM=%.9f, diff=%.9e\n", 
+		       dist_c, dist_asm, fabs(dist_c - dist_asm));
+	}
+
+	// Test 3: D non multiplo di 4 (testa residui)
+	{
+		type v[255], w[255];
+		for (int i = 0; i < 255; i++) {
+			v[i] = 2.0f;
+			w[i] = 1.0f;
+		}
+		type dist_c = euclidean_distance_c(v, w, 255);
+		type dist_asm = euclidean_distance_asm(v, w, 255);
+		printf("Test 3 (D=255):  C=%.9f, ASM=%.9f, diff=%.9e\n\n", 
+		       dist_c, dist_asm, fabs(dist_c - dist_asm));
+	}
+
 	clock_t t;
 	float time;
 
@@ -120,7 +166,6 @@ int main(int argc, char** argv) {
 	// =========================================================
 	fit(input);
 	// =========================================================
-	//t = omp_get_wtime() - t; POST FIT TIME A 0 SECONDI
 	time = omp_get_wtime() -t;
 
 	if(!input->silent)
@@ -132,7 +177,6 @@ int main(int argc, char** argv) {
 	// =========================================================
 	predict(input);
 	// =========================================================
-	//t = omp_get_wtime() - t;
 	time = omp_get_wtime() - t;
 
 	if(!input->silent)
@@ -168,7 +212,7 @@ int main(int argc, char** argv) {
 	_mm_free(input->id_nn);
 	_mm_free(input->dist_nn);
 	//aggiunta di due free
-	_mm_free(input-> DS_quantized_plus); 
+	_mm_free(input->DS_quantized_plus); 
 	_mm_free(input->DS_quantized_minus);
 	free(input);
 

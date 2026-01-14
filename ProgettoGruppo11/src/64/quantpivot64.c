@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 //dichiaro funzione assembly
-// extern type euclidean_distance_asm(const type* v, const type* w, int D);     TODO COMMENTO SOLO PER DEBUG 
+extern type euclidean_distance_asm(const type* v, const type* w, int D);     
 
 // ============================================================================
 // FUNZIONE DI COMPARAZIONE PER qsort
@@ -106,8 +106,8 @@ type euclidean_distance_c(const type* v, const type* w, int D) {
 // ============================================================================
 type euclidean_distance(const type* v, const type* w, int D) {
     // Chiama la versione assembly ottimizzata SSE
-    //return euclidean_distance_asm(v, w, D);   // TODO COMMENTO SOLO PER DEBUG
-    return euclidean_distance_c(v, w, D);
+    return euclidean_distance_asm(v, w, D);   
+    //return euclidean_distance_c(v, w, D);
 }
 
 
