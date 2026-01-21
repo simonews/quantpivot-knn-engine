@@ -3,6 +3,7 @@
 #include <time.h>
 #include <xmmintrin.h>
 #include <omp.h>
+#include <math.h>  // ✅ AGGIUNTO per fabs()
 
 #include "common.h"
 #include "quantpivot64omp.c"
@@ -129,6 +130,25 @@ int main(int argc, char** argv) {
     printf("Dataset caricato: N=%d, D=%d\n", input->N, input->D);
     printf("Query caricate: nq=%d, D=%d\n", input->nq, input->D);
     printf("Thread OpenMP disponibili: %d\n", omp_get_max_threads());
+
+    // ========== ✅ TEST ASSEMBLY ==========
+    if (!input->silent) {
+        printf("\n[TEST] Verifica euclidean_distance_asm...\n");
+        type* v1 = &input->DS[0];
+        type* v2 = &input->DS[input->D];
+        type dist_c = euclidean_distance_c(v1, v2, input->D);
+        type dist_asm = euclidean_distance_asm(v1, v2, input->D);
+        printf("      Distanza C:   %.10f\n", dist_c);
+        printf("      Distanza ASM: %.10f\n", dist_asm);
+        printf("      Differenza:   %.2e\n", fabs(dist_c - dist_asm));
+        if (fabs(dist_c - dist_asm) < 1e-9) {
+            printf("      ✅ TEST PASSED\n\n");
+        } else {
+            printf("      ❌ TEST FAILED\n\n");
+            exit(1);
+        }
+    }
+    // ======================================
 
     double t;
     
