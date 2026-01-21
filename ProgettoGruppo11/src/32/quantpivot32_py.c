@@ -263,7 +263,7 @@ static PyMethodDef QuantPivot32_methods[] = {
 // Definizione del tipo Python
 static PyTypeObject QuantPivot32Type = {
 	PyVarObject_HEAD_INIT(NULL, 0)
-	.tp_name = "gruppoX.quantpivot32.QuantPivot",
+	.tp_name = "gruppo11.quantpivot32.QuantPivot",
 	.tp_doc = "QuantPivot 32-bit indexing and querying",
 	.tp_basicsize = sizeof(QuantPivot32Object),
 	.tp_itemsize = 0,
