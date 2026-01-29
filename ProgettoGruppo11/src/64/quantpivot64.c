@@ -7,17 +7,17 @@
 #include "common.h"
 #include <stdint.h>
 
-//dichiaro funzione assembly
+// dichiara funzione assembly
 extern type euclidean_distance_asm(const type* v, const type* w, int D);     
 
-// ============================================================================
-// FUNZIONE DI COMPARAZIONE PER qsort
-// ============================================================================
+
 typedef struct {
     type abs_val;
     int idx;
 } pair_t;
 
+
+// funzione di comparazione per q sort
 int compare_pairs(const void* a, const void* b) {
     pair_t* pa = (pair_t*)a;
     pair_t* pb = (pair_t*)b;
@@ -28,13 +28,13 @@ int compare_pairs(const void* a, const void* b) {
     return 0;
 }
 
-// ============================================================================
-// 1. QUANTIZE - Trasforma vettore in rappresentazione binaria sparsa
-// ============================================================================
+
+// QUANTIZE - Trasforma vettore in rappresentazione binaria sparsa
 void quantize(const type* v, int D, int x, 
               uint8_t* v_plus, uint8_t* v_minus) {
     
-    // 1. Crea array di coppie (|v[i]|, indice)
+    // v ora è un array di double
+    // Crea array di coppie (|v[i]|, indice)
     pair_t* pairs = malloc(D * sizeof(pair_t));
     if (!pairs) {
         fprintf(stderr, "Errore allocazione in quantize\n");
@@ -46,14 +46,14 @@ void quantize(const type* v, int D, int x,
         pairs[i].idx = i;
     }
     
-    // 2. Trova x elementi con valore assoluto massimo
+    // Trova x elementi con valore assoluto massimo
     qsort(pairs, D, sizeof(pair_t), compare_pairs);
     
-    // 3. Inizializza v_plus e v_minus a 0
+    // Inizializza v_plus e v_minus a 0
     memset(v_plus, 0, D * sizeof(uint8_t));
     memset(v_minus, 0, D * sizeof(uint8_t));
     
-    // 4. Setta bit per i primi x elementi
+    // Setta bit per i primi x elementi
     for (int j = 0; j < x && j < D; j++) {
         int idx = pairs[j].idx;
         if (v[idx] >= 0) {
@@ -66,30 +66,26 @@ void quantize(const type* v, int D, int x,
     free(pairs);
 }
 
-// ============================================================================
-// 2. APPROX_DISTANCE - Distanza approssimata tra vettori quantizzati
-// ============================================================================
+
+// APPROX_DISTANCE - Distanza approssimata tra vettori quantizzati
 type approx_distance(const uint8_t* vp, const uint8_t* vm,
                      const uint8_t* wp, const uint8_t* wm, int D) {
     int dot_pp = 0, dot_mm = 0, dot_pm = 0, dot_mp = 0;
     
     for (int i = 0; i < D; i++) {
-        // Prodotto scalare binario = somma di AND
+        // Prodotto scalare binario = AND bit a bit
         dot_pp += (vp[i] & wp[i]);
         dot_mm += (vm[i] & wm[i]);
         dot_pm += (vp[i] & wm[i]);
         dot_mp += (vm[i] & wp[i]);
     }
-    
+    // Il calcolo all'interno avviene con int, poi si fa il casting a type
     // Formula: (v+·w+) + (v-·w-) - (v+·w-) - (v-·w+)
     return (type)(dot_pp + dot_mm - dot_pm - dot_mp);
 }
 
-// ============================================================================
-// 3. EUCLIDEAN_DISTANCE - Distanza euclidea esatta (da ottimizzare in Sprint 2)
-// ============================================================================
 
-//rinomino
+// EUCLIDEAN_DISTANCE - Distanza euclidea esatta 
 type euclidean_distance_c(const type* v, const type* w, int D) {
     type sum = 0.0;
     
@@ -101,9 +97,8 @@ type euclidean_distance_c(const type* v, const type* w, int D) {
     return sqrt(sum);
 }
 
-// ============================================================================
-// 3b. EUCLIDEAN_DISTANCE - Wrapper che usa assembly
-// ============================================================================
+
+// EUCLIDEAN_DISTANCE - Wrapper che usa assembly
 type euclidean_distance(const type* v, const type* w, int D) {
     // Chiama la versione assembly ottimizzata SSE
     return euclidean_distance_asm(v, w, D);   
@@ -111,9 +106,8 @@ type euclidean_distance(const type* v, const type* w, int D) {
 }
 
 
-// ============================================================================
-// 4. FIT - Costruzione dell'indice
-// ============================================================================
+
+// FIT Costruzione dell'indice
 void fit(params* input) {
     if (!input->silent) {
         printf("[FIT] Inizio costruzione indice...\n");
@@ -127,14 +121,14 @@ void fit(params* input) {
         exit(1);
     }
     
-    // 1. Alloca array pivot (solo indici)
+    // Alloca array pivot (solo indici)
     input->P = _mm_malloc(input->h * sizeof(int), align);
     if (!input->P) {
         fprintf(stderr, "Errore allocazione pivot\n");
         exit(1);
     }
     
-    // 2. Seleziona h pivot (campionamento uniforme)
+    // Seleziona h pivot (campionamento uniforme)
     int step = input->N / input->h;
     if (!input->silent) printf("[FIT] Selezione pivot (step=%d)...\n", step);
     
@@ -144,14 +138,14 @@ void fit(params* input) {
         input->P[j] = pivot_idx;
     }
     
-    // 3. Alloca indice [N x h]
+    // Alloca indice [N x h]
     input->index = _mm_malloc(input->N * input->h * sizeof(type), align);
     if (!input->index) {
         fprintf(stderr, "Errore allocazione indice\n");
         exit(1);
     }
     
-    // 4. Alloca array per vettori quantizzati
+    // Alloca array per vettori quantizzati
     if (!input->silent) printf("[FIT] Allocazione vettori quantizzati...\n");
     uint8_t* DS_vp = malloc(input->N * input->D * sizeof(uint8_t));
     uint8_t* DS_vm = malloc(input->N * input->D * sizeof(uint8_t));
@@ -163,14 +157,14 @@ void fit(params* input) {
         exit(1);
     }
     
-    // 5. Quantizza tutti i punti del dataset
+    // Quantizza tutti i punti del dataset
     if (!input->silent) printf("[FIT] Quantizzazione dataset (%d punti)...\n", input->N);
     for (int i = 0; i < input->N; i++) {
         quantize(&input->DS[i * input->D], input->D, input->x,
                  &DS_vp[i * input->D], &DS_vm[i * input->D]);
     }
     
-    // 6. Quantizza tutti i pivot
+    // Quantizza tutti i pivot
     if (!input->silent) printf("[FIT] Quantizzazione pivot (%d pivot)...\n", input->h);
     for (int j = 0; j < input->h; j++) {
         int pivot_idx = input->P[j];
@@ -178,7 +172,7 @@ void fit(params* input) {
                  &P_vp[j * input->D], &P_vm[j * input->D]);
     }
     
-    // 7. Costruisci indice: per ogni punto DS, calcola distanza a ogni pivot
+    // Costruisci indice: per ogni punto DS, calcola distanza a ogni pivot
     if (!input->silent) printf("[FIT] Costruzione indice [%d x %d]...\n", input->N, input->h);
     for (int i = 0; i < input->N; i++) {
         for (int j = 0; j < input->h; j++) {
@@ -189,7 +183,7 @@ void fit(params* input) {
         }
     }
     
-    // 8. SALVA dataset quantizzato per predict
+    // SALVA dataset quantizzato (sempre uint8_t) per predict
     input->DS_quantized_plus = _mm_malloc(input->N * input->D * sizeof(uint8_t), align);
     input->DS_quantized_minus = _mm_malloc(input->N * input->D * sizeof(uint8_t), align);
     memcpy(input->DS_quantized_plus, DS_vp, input->N * input->D * sizeof(uint8_t));
@@ -204,9 +198,8 @@ void fit(params* input) {
     if (!input->silent) printf("[FIT] Completato!\n");
 }
 
-// ============================================================================
+
 // 5. PREDICT - Ricerca K-NN con pruning
-// ============================================================================
 void predict(params* input) {
     if (!input->silent) {
         printf("[PREDICT] Inizio ricerca K-NN...\n");
@@ -245,10 +238,10 @@ void predict(params* input) {
         
         type* q = &input->Q[qi * input->D];
         
-        // 1. Quantizza query
+        // Quantizza query
         quantize(q, input->D, input->x, q_vp, q_vm);
         
-        // 2. Calcola distanze query → pivot
+        // Calcola distanze query → pivot
         for (int j = 0; j < input->h; j++) {
             q_to_pivots[j] = approx_distance(q_vp, q_vm,
                                              &P_vp[j * input->D],
@@ -256,13 +249,14 @@ void predict(params* input) {
                                              input->D);
         }
         
-        // 3. Inizializza lista K-NN
+        // Inizializza lista K-NN
         for (int i = 0; i < input->k; i++) {
             knn_ids[i] = -1;
             knn_dists[i] = INFINITY;
         }
         
-        // 4. Scansione dataset con pruning
+        // Scansione dataset con pruning
+        // La logica del pruning triangolare funziona allo stesso modo con i double 
         int pruned = 0;
         for (int i = 0; i < input->N; i++) {
             // Calcola bound triangolare (max su tutti i pivot)
@@ -299,8 +293,9 @@ void predict(params* input) {
             }
         }
         
-        // 5. Raffinamento: distanza euclidea esatta sui K candidati
-        for (int idx = 0; idx < input->k; idx++) {  // ✅ RINOMINA i → idx
+        // Raffinamento: distanza (AVX) euclidea esatta sui K candidati
+        // Si usa idx e non i come indice per non creare confusione 
+        for (int idx = 0; idx < input->k; idx++) {  
             if (knn_ids[idx] >= 0) {
                 knn_dists[idx] = euclidean_distance(q,
                                                     &input->DS[knn_ids[idx] * input->D],
@@ -308,9 +303,9 @@ void predict(params* input) {
             }
         }
         
-        // 6. Riordina dopo raffinamento (bubble sort per k piccolo)
-        for (int pass = 0; pass < input->k - 1; pass++) {  // ✅ RINOMINA i → pass
-            for (int j = 0; j < input->k - 1 - pass; j++) {  // ✅ USA pass
+        // Riordina dopo raffinamento (bubble sort per k piccolo)
+        for (int pass = 0; pass < input->k - 1; pass++) {  
+            for (int j = 0; j < input->k - 1 - pass; j++) {  
                 if (knn_dists[j] > knn_dists[j + 1]) {
                     // Swap distanze
                     type tmp_d = knn_dists[j];
@@ -329,7 +324,7 @@ void predict(params* input) {
             qi, qi * input->k);
         }
         
-        // 7. Salva risultati
+        // Salva risultati
         memcpy(&input->id_nn[qi * input->k], knn_ids, input->k * sizeof(int));
         memcpy(&input->dist_nn[qi * input->k], knn_dists, input->k * sizeof(type));
     }

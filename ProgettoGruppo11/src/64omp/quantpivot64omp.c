@@ -7,17 +7,16 @@
 #include "common.h"
 #include <stdint.h>
 
-// ✅ Dichiarazione funzione assembly
+
 extern type euclidean_distance_asm(const type* v, const type* w, int D);
 
-// ============================================================================
-// FUNZIONE DI COMPARAZIONE PER qsort
-// ============================================================================
+
 typedef struct {
     type abs_val;
     int idx;
 } pair_t;
 
+// funzione di comparazione per qsort
 int compare_pairs(const void* a, const void* b) {
     pair_t* pa = (pair_t*)a;
     pair_t* pb = (pair_t*)b;
@@ -28,13 +27,12 @@ int compare_pairs(const void* a, const void* b) {
     return 0;
 }
 
-// ============================================================================
-// 1. QUANTIZE - Trasforma vettore in rappresentazione binaria sparsa
-// ============================================================================
+
+// QUANTIZE - Trasforma vettore in rappresentazione binaria sparsa
 void quantize(const type* v, int D, int x, 
               uint8_t* v_plus, uint8_t* v_minus) {
     
-    // 1. Crea array di coppie (|v[i]|, indice)
+    // Crea array di coppie (|v[i]|, indice)
     pair_t* pairs = malloc(D * sizeof(pair_t));
     if (!pairs) {
         fprintf(stderr, "Errore allocazione in quantize\n");
@@ -46,14 +44,14 @@ void quantize(const type* v, int D, int x,
         pairs[i].idx = i;
     }
     
-    // 2. Trova x elementi con valore assoluto massimo
+    // Trova x elementi con valore assoluto massimo
     qsort(pairs, D, sizeof(pair_t), compare_pairs);
     
-    // 3. Inizializza v_plus e v_minus a 0
+    // Inizializza v_plus e v_minus a 0
     memset(v_plus, 0, D * sizeof(uint8_t));
     memset(v_minus, 0, D * sizeof(uint8_t));
     
-    // 4. Setta bit per i primi x elementi
+    // Setta bit per i primi x elementi
     for (int j = 0; j < x && j < D; j++) {
         int idx = pairs[j].idx;
         if (v[idx] >= 0) {
@@ -66,15 +64,13 @@ void quantize(const type* v, int D, int x,
     free(pairs);
 }
 
-// ============================================================================
-// 2. APPROX_DISTANCE - Distanza approssimata tra vettori quantizzati
-// ============================================================================
+// APPROX_DISTANCE - Distanza approssimata tra vettori quantizzati
 type approx_distance(const uint8_t* vp, const uint8_t* vm,
                      const uint8_t* wp, const uint8_t* wm, int D) {
     int dot_pp = 0, dot_mm = 0, dot_pm = 0, dot_mp = 0;
     
     for (int i = 0; i < D; i++) {
-        // Prodotto scalare binario = somma di AND
+        // Prodotto scalare binario = AND bit a bit
         dot_pp += (vp[i] & wp[i]);
         dot_mm += (vm[i] & wm[i]);
         dot_pm += (vp[i] & wm[i]);
@@ -85,9 +81,8 @@ type approx_distance(const uint8_t* vp, const uint8_t* vm,
     return (type)(dot_pp + dot_mm - dot_pm - dot_mp);
 }
 
-// ============================================================================
-// 3. EUCLIDEAN_DISTANCE - Distanza euclidea esatta (versione C)
-// ============================================================================
+
+// EUCLIDEAN_DISTANCE - Distanza euclidea esatta (versione C)
 type euclidean_distance_c(const type* v, const type* w, int D) {
     type sum = 0.0;
     
@@ -99,19 +94,17 @@ type euclidean_distance_c(const type* v, const type* w, int D) {
     return sqrt(sum);
 }
 
-// ============================================================================
-// 3b. EUCLIDEAN_DISTANCE - Usa versione C per ora
-// ============================================================================
+
+// EUCLIDEAN_DISTANCE - wrapper
 type euclidean_distance(const type* v, const type* w, int D) {
-    // Usa versione C (assembly verrà integrata dopo)
+    
     //return euclidean_distance_c(v, w, D);
     return euclidean_distance_asm(v, w, D);  
 }
 
 
-// ============================================================================
-// 4. FIT - Costruzione dell'indice (PARALLELIZZATO)
-// ============================================================================
+
+// FIT - Costruzione dell'indice (PARALLELIZZATO)
 void fit(params* input) {
     if (!input->silent) {
         printf("[FIT] Inizio costruzione indice...\n");
@@ -125,14 +118,14 @@ void fit(params* input) {
         exit(1);
     }
     
-    // 1. Alloca array pivot (solo indici)
+    // Alloca array pivot (solo indici)
     input->P = _mm_malloc(input->h * sizeof(int), align);
     if (!input->P) {
         fprintf(stderr, "Errore allocazione pivot\n");
         exit(1);
     }
     
-    // 2. Seleziona h pivot (campionamento uniforme)
+    // Seleziona h pivot (campionamento uniforme)
     int step = input->N / input->h;
     if (!input->silent) printf("[FIT] Selezione pivot (step=%d)...\n", step);
     
@@ -142,14 +135,14 @@ void fit(params* input) {
         input->P[j] = pivot_idx;
     }
     
-    // 3. Alloca indice [N x h]
+    // Alloca indice [N x h]
     input->index = _mm_malloc(input->N * input->h * sizeof(type), align);
     if (!input->index) {
         fprintf(stderr, "Errore allocazione indice\n");
         exit(1);
     }
     
-    // 4. Alloca array per vettori quantizzati
+    // Alloca array per vettori quantizzati
     if (!input->silent) printf("[FIT] Allocazione vettori quantizzati...\n");
     uint8_t* DS_vp = malloc(input->N * input->D * sizeof(uint8_t));
     uint8_t* DS_vm = malloc(input->N * input->D * sizeof(uint8_t));
@@ -161,7 +154,7 @@ void fit(params* input) {
         exit(1);
     }
     
-    // 5. Quantizza tutti i punti del dataset (PARALLELIZZATO)
+    // Quantizza tutti i punti del dataset (PARALLELIZZATO)
     if (!input->silent) printf("[FIT] Quantizzazione dataset (%d punti)...\n", input->N);
     // schedule(static): costo uniforme per ogni iterazione
     #pragma omp parallel for schedule(static)
@@ -170,7 +163,7 @@ void fit(params* input) {
                  &DS_vp[i * input->D], &DS_vm[i * input->D]);
     }
     
-    // 6. Quantizza tutti i pivot (sequenziale, h piccolo)
+    // Quantizza tutti i pivot (sequenziale, h piccolo)
     if (!input->silent) printf("[FIT] Quantizzazione pivot (%d pivot)...\n", input->h);
     for (int j = 0; j < input->h; j++) {
         int pivot_idx = input->P[j];
@@ -178,7 +171,7 @@ void fit(params* input) {
                  &P_vp[j * input->D], &P_vm[j * input->D]);
     }
     
-    // 7. Costruisci indice: per ogni punto DS, calcola distanza a ogni pivot (PARALLELIZZATO)
+    // Costruisci indice: per ogni punto DS, calcola distanza a ogni pivot (PARALLELIZZATO)
     if (!input->silent) printf("[FIT] Costruzione indice [%d x %d]...\n", input->N, input->h);
     // collapse(2): unisce i due loop per bilanciare meglio il carico
     #pragma omp parallel for collapse(2) schedule(static)
@@ -191,7 +184,7 @@ void fit(params* input) {
         }
     }
     
-    // 8. SALVA dataset quantizzato per predict
+    // SALVA dataset quantizzato per predict
     input->DS_quantized_plus = _mm_malloc(input->N * input->D * sizeof(uint8_t), align);
     input->DS_quantized_minus = _mm_malloc(input->N * input->D * sizeof(uint8_t), align);
     memcpy(input->DS_quantized_plus, DS_vp, input->N * input->D * sizeof(uint8_t));
@@ -206,9 +199,8 @@ void fit(params* input) {
     if (!input->silent) printf("[FIT] Completato!\n");
 }
 
-// ============================================================================
-// 5. PREDICT - Ricerca K-NN con pruning (PARALLELIZZATO)
-// ============================================================================
+
+// PREDICT - Ricerca K-NN con pruning (PARALLELIZZATO)
 void predict(params* input) {
     if (!input->silent) {
         printf("[PREDICT] Inizio ricerca K-NN...\n");
@@ -229,18 +221,21 @@ void predict(params* input) {
     uint8_t* DS_vp = input->DS_quantized_plus;
     uint8_t* DS_vm = input->DS_quantized_minus;
         
-    // ✅ PARALLELIZZAZIONE SU QUERY (SCHEDULE DYNAMIC per pruning disuguale)
-    // Ogni thread ha i PROPRI buffer privati
+    // PARALLELIZZAZIONE su query (schedule(dynamic) per pruning disuguale)
+    // Ogni thread ha i propri buffer privati
     #pragma omp parallel
     {
-        // ✅ ALLOCAZIONI PRIVATE PER OGNI THREAD
+        /*
+        *  Alllocazione dentro la regione parallela -> ogni thread allora i 
+        *  suoi buffer personali, altrimenti scriverebbero tutti nello stesso buffer
+        */
         uint8_t* q_vp = malloc(input->D * sizeof(uint8_t));
         uint8_t* q_vm = malloc(input->D * sizeof(uint8_t));
         type* q_to_pivots = malloc(input->h * sizeof(type));
         int* knn_ids = malloc(input->k * sizeof(int));
         type* knn_dists = malloc(input->k * sizeof(type));
         
-        // Loop parallelo sulle query
+        // Loop parallelo sulle query (schedule dinamico qui)
         #pragma omp for schedule(dynamic)
         for (int qi = 0; qi < input->nq; qi++) {
             
@@ -248,16 +243,16 @@ void predict(params* input) {
                 // printf in parallelo può sovrapporsi ma è accettabile per debug
                 #pragma omp critical
                 {
-                    printf("          Query %d/%d (thread %d)\n", qi+1, input->nq, omp_get_thread_num());
+                    printf(" Query %d/%d (thread %d)\n", qi+1, input->nq, omp_get_thread_num());
                 }
             }
             
             type* q = &input->Q[qi * input->D];
             
-            // 1. Quantizza query
+            // Quantizza query
             quantize(q, input->D, input->x, q_vp, q_vm);
             
-            // 2. Calcola distanze query → pivot
+            // Calcola distanze query → pivot
             for (int j = 0; j < input->h; j++) {
                 q_to_pivots[j] = approx_distance(q_vp, q_vm,
                                                  &P_vp[j * input->D],
@@ -265,13 +260,13 @@ void predict(params* input) {
                                                  input->D);
             }
             
-            // 3. Inizializza lista K-NN
+            // Inizializza lista K-NN
             for (int i = 0; i < input->k; i++) {
                 knn_ids[i] = -1;
                 knn_dists[i] = INFINITY;
             }
             
-            // 4. Scansione dataset con pruning
+            // Scansione dataset con pruning
             int pruned = 0;
             for (int i = 0; i < input->N; i++) {
                 // Calcola bound triangolare (max su tutti i pivot)
@@ -308,7 +303,7 @@ void predict(params* input) {
                 }
             }
             
-            // 5. Raffinamento: distanza euclidea esatta sui K candidati
+            // Raffinamento: distanza euclidea esatta sui K candidati
             for (int idx = 0; idx < input->k; idx++) {
                 if (knn_ids[idx] >= 0) {
                     knn_dists[idx] = euclidean_distance(q,
@@ -317,7 +312,7 @@ void predict(params* input) {
                 }
             }
             
-            // 6. Riordina dopo raffinamento (bubble sort per k piccolo)
+            // Riordina dopo raffinamento (bubble sort per k piccolo)
             for (int pass = 0; pass < input->k - 1; pass++) {
                 for (int j = 0; j < input->k - 1 - pass; j++) {
                     if (knn_dists[j] > knn_dists[j + 1]) {
@@ -333,12 +328,12 @@ void predict(params* input) {
                 }
             }
             
-            // 7. Salva risultati (thread-safe: ogni thread scrive area diversa)
+            // Salva risultati (thread-safe: ogni thread ha un qi univoco grazie  a #pragma omp for)
             memcpy(&input->id_nn[qi * input->k], knn_ids, input->k * sizeof(int));
             memcpy(&input->dist_nn[qi * input->k], knn_dists, input->k * sizeof(type));
         }
         
-        // ✅ CLEANUP BUFFER PRIVATI (uno per thread)
+        // Cleanup dei buffer 
         free(q_vp); 
         free(q_vm); 
         free(q_to_pivots);

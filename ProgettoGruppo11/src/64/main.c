@@ -12,10 +12,6 @@
 #include "quantpivot64.c"
 
 /*
-*
-* 	load_data
-* 	=========
-*
 *	Legge da file una matrice di N righe
 * 	e M colonne e la memorizza in un array lineare in row-major order
 *
@@ -41,7 +37,11 @@ MATRIX load_data(char* filename, int *n, int *k) {
     printf("[DEBUG] File: %s, rows=%d, cols=%d, sizeof(type)=%zu\n",
            filename, rows, cols, sizeof(type));
     
-    // ✅ ALLOCA e leggi direttamente come type (double)
+    /*
+	*  sizeof ora vale 8 byte
+	*  align ora vale 32 byte
+	*  fread legge blocchi da 8 byte 
+	*/
     MATRIX data = _mm_malloc(rows * cols * sizeof(type), align);
     status = fread(data, sizeof(type), rows * cols, fp);
     fclose(fp);
@@ -53,9 +53,6 @@ MATRIX load_data(char* filename, int *n, int *k) {
 }
 
 /*
-* 	save_data
-* 	=========
-* 
 *	Salva su file un array lineare in row-major order
 *	come matrice di N righe e M colonne
 * 
@@ -86,10 +83,10 @@ void save_data(char* filename, void* X, int n, int k) {
 }
 
 /*
-* save_int_data
-* =============
-* Versione specifica per salvare array di interi (4 byte)
-* indipendentemente dalla definizione di "type" globale.
+*  Versione specifica per salvare array di interi (4 byte)
+*  indipendentemente dalla definizione di "type" globale
+*  Garantisce che il file out_idnn.ds2 abbia sempre lo stesso formato
+*  (interi a 32 bit) 
 */
 void save_int_data(char* filename, int* X, int n, int k) {
     FILE* fp;
@@ -113,18 +110,18 @@ void save_int_data(char* filename, int* X, int n, int k) {
 
 int main(int argc, char** argv) {
 
-	// ================= Parametri di ingresso =================
+	// parametri di ingresso
 	char* dsfilename = "../../../dataset_2000x256_64.ds2";
 	char* queryfilename = "../../../query_2000x256_64.ds2";
 	int h = 20;
 	int k = 8;
 	int x = 2;
 	int silent = 0;
-	// =========================================================
+	
 
 	params* input = malloc(sizeof(params));
 
-	// ✅ INIZIALIZZA SUBITO i parametri
+	// inizializza i parametri 
 	input->h = h;
 	input->k = k;
 	input->x = x;
@@ -133,10 +130,11 @@ int main(int argc, char** argv) {
 	input->DS = load_data(dsfilename, &input->N, &input->D);
 	input->Q = load_data(queryfilename, &input->nq, &input->D);
 
-	// ✅ ORA k è già inizializzato
+	
 	input->id_nn = _mm_malloc(input->nq*input->k*sizeof(int), align);
 	input->dist_nn = _mm_malloc(input->nq*input->k*sizeof(type), align);
 
+	// inizializza puntatori a NULL così da evitare crash 
 	input->P = NULL;
 	input->index = NULL;
 	input->DS_quantized_plus = NULL;
@@ -151,9 +149,10 @@ int main(int argc, char** argv) {
 	float time;
 
 	t = omp_get_wtime();
-	// =========================================================
+	
+	// FIT 
 	fit(input);
-	// =========================================================
+	
 	time = omp_get_wtime() -t; //rimosso divisione per CLOCKS_PER_SEC
 
 	if(!input->silent)
@@ -162,9 +161,10 @@ int main(int argc, char** argv) {
 		printf("%.3f\n", time);
 
 	t = omp_get_wtime();
-	// =========================================================
+	
+	// PREDICT
 	predict(input);
-	// =========================================================
+	
 	time = omp_get_wtime() -t; 
 
 	if(!input->silent)

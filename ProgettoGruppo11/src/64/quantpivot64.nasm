@@ -1,17 +1,20 @@
-; ============================================================================
-; quantpivot64.nasm - Implementazione AVX 64-bit di euclidean_distance (FIXED)
-; ============================================================================
+; Implementazione AVX 64-bit di euclidean_distance 
 ; BUG FIX: I residui scalari vengono ora accumulati in un registro separato
 ; e sommati al totale PRIMA della riduzione orizzontale
-; ============================================================================
 
-default rel
+; imposta l'indirizzamento relativo come default
+; il codice a 64 bit deve essere Position Indipendent
+default rel 
 
 section .text
 global euclidean_distance_asm
 
+; a differenza della precedente versione, qui i parametri sono passati nei registri
+; (nell'altra erano sullo stack)
 euclidean_distance_asm:
     ; Inizializza accumulatore vettoriale a zero
+    ; ymm0: registro a 256 bit per le somme parziali dei 4 double 
+    ; xmm2: registro separato per i residui scalari 
     vxorpd ymm0, ymm0, ymm0        ; ymm0 = [0.0, 0.0, 0.0, 0.0] (somma vettoriale)
     vxorpd xmm2, xmm2, xmm2        ; xmm2 = 0.0 (somma scalare residui)
     
@@ -21,22 +24,22 @@ euclidean_distance_asm:
     jz .residual                    ; Se D < 4, salta al residuo
 
 .vector_loop:
-    ; Carica 4 double da v e w (32 byte)
+    ; Carica 4 double rispettivamente da v e w (32 byte)
     vmovupd ymm1, [rdi]             ; ymm1 = v[i..i+3]
     vmovupd ymm3, [rsi]             ; ymm3 = w[i..i+3]
     
     ; Calcola differenza
     vsubpd ymm1, ymm1, ymm3         ; ymm1 = v[i..i+3] - w[i..i+3]
     
-    ; Eleva al quadrato
-    vmulpd ymm1, ymm1, ymm1         ; ymm1 = diff²
+    ; Eleva al quadrato 
+    vmulpd ymm1, ymm1, ymm1         ; ymm1 = diff^2
     
-    ; Accumula
-    vaddpd ymm0, ymm0, ymm1         ; ymm0 += diff²
+    ; Accumula in ymm0 
+    vaddpd ymm0, ymm0, ymm1         ; ymm0 += diff^2
     
     ; Avanza puntatori
-    add rdi, 32
-    add rsi, 32
+    add rdi, 32 ; avanza v
+    add rsi, 32 ; avanza w
     
     ; Decrementa e ripeti
     dec eax
@@ -53,9 +56,10 @@ euclidean_distance_asm:
     vmovsd xmm1, [rdi]              ; xmm1 = v[i]
     vmovsd xmm3, [rsi]              ; xmm3 = w[i]
     
-    vsubsd xmm1, xmm1, xmm3         ; xmm1 = v[i] - w[i]
-    vmulsd xmm1, xmm1, xmm1         ; xmm1 = (v[i] - w[i])²
-    vaddsd xmm2, xmm2, xmm1         ; xmm2 += (v[i] - w[i])² (ACCUMULA IN XMM2!)
+    vsubsd xmm1, xmm1, xmm3         ; xmm1 = v[i] - w[i] sottrazione scalare
+    vmulsd xmm1, xmm1, xmm1         ; xmm1 = (v[i] - w[i])^2 quadrato scalare
+    ; Thread-safe: nessun buffer globale (ACCUMULA IN XMM2)
+    vaddsd xmm2, xmm2, xmm1         ; xmm2 += (v[i] - w[i])^2 
     
     ; Avanza puntatori
     add rdi, 8
@@ -67,11 +71,12 @@ euclidean_distance_asm:
 
 .horizontal_sum:
     ; Somma orizzontale dei 4 double in YMM0
-    vextractf128 xmm1, ymm0, 1      ; xmm1 = [c, d] (parte alta)
-    vaddpd xmm0, xmm0, xmm1         ; xmm0 = [a+c, b+d]
-    vhaddpd xmm0, xmm0, xmm0        ; xmm0 = [a+b+c+d, a+b+c+d]
-    
-    ; ✅ FIX: Aggiungi la somma scalare dei residui
+    vextractf128 xmm1, ymm0, 1      ; xmm1 = [c, d] (estrae la metà alta)
+    vaddpd xmm0, xmm0, xmm1         ; xmm0 = [a+c, b+d] (somma le due metà)
+    vhaddpd xmm0, xmm0, xmm0        ; xmm0 = [a+b+c+d, a+b+c+d] (somma orizzontale)
+    ; ora la somma vettoriale totale è nel primo elemento di xmm0
+
+    ; somma scalare dei residui
     vaddsd xmm0, xmm0, xmm2         ; xmm0 += somma_residui
     
     ; Calcola radice quadrata

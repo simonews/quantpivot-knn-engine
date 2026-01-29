@@ -11,14 +11,15 @@
 
 typedef struct{
 	// Variabili
-	MATRIX DS; 					// dataset
+	MATRIX DS; 					// dataset (qui array di double)
 	int* P;						// vettore contenente gli indici dei pivot
-	MATRIX index;				// indice
-	MATRIX Q;					// query
-	int* id_nn;					// per ogni query point gli ID dei K-NN
-	MATRIX dist_nn;				// per ogni query point le distanze dai K-NN
+	MATRIX index;				// indice (qui array di double)
+	MATRIX Q;					// query (qui array di double)
+	int* id_nn;					// ID dei vicini
+	MATRIX dist_nn;				// distanze (qui array di double)
 
-	// ADDED after christian's version
+	
+	// gli array restano uint8_t (quantizzazione binaria)
 	uint8_t* DS_quantized_plus; 
 	uint8_t* DS_quantized_minus; 
 

@@ -3,21 +3,19 @@
 #include <time.h>
 #include <xmmintrin.h>
 #include <omp.h>
-#include <math.h>  // ✅ AGGIUNTO per fabs()
+#include <math.h>  
 
 #include "common.h"
 #include "quantpivot64omp.c"
 
 /*
- * load_data
- * =========
- * Legge da file una matrice di N righe e M colonne
- * Memorizzazione in row-major order
+ *  Legge da file una matrice di N righe e M colonne
+ *  Memorizzazione in row-major order
  *
- * Codifica file:
- * - primi 4 byte: numero righe (N) → int
- * - successivi 4 byte: numero colonne (M) → int
- * - successivi N*M*sizeof(type) byte: dati matrice
+ *  Codifica file:
+ *  - primi 4 byte: numero righe (N) → int
+ *  - successivi 4 byte: numero colonne (M) → int
+ *  - successivi N*M*sizeof(type) byte: dati matrice
  */
 MATRIX load_data(char* filename, int *n, int *k) {
     FILE* fp;
@@ -36,7 +34,7 @@ MATRIX load_data(char* filename, int *n, int *k) {
     printf("[DEBUG] File: %s, rows=%d, cols=%d, sizeof(type)=%zu\n",
            filename, rows, cols, sizeof(type));
     
-    // Alloca e leggi come type (double)
+    // Alloca e legge come type (double)
     MATRIX data = _mm_malloc(rows * cols * sizeof(type), align);
     status = fread(data, sizeof(type), rows * cols, fp);
     fclose(fp);
@@ -48,9 +46,7 @@ MATRIX load_data(char* filename, int *n, int *k) {
 }
 
 /*
- * save_data
- * =========
- * Salva array lineare come matrice N x M
+ *  Salva array lineare come matrice N x M
  */
 void save_data(char* filename, void* X, int n, int k) {
     FILE* fp;
@@ -73,8 +69,6 @@ void save_data(char* filename, void* X, int n, int k) {
 }
 
 /*
- * save_int_data
- * =============
  * Versione per array di interi (4 byte)
  */
 void save_int_data(char* filename, int* X, int n, int k) {
@@ -99,14 +93,14 @@ void save_int_data(char* filename, int* X, int n, int k) {
 
 int main(int argc, char** argv) {
 
-    // ================= Parametri di ingresso =================
+    // Parametri di ingresso
     char* dsfilename = "../../../dataset_2000x256_64.ds2";
     char* queryfilename = "../../../query_2000x256_64.ds2";
     int h = 20;
     int k = 8;
     int x = 2;
     int silent = 0;
-    // =========================================================
+    
 
     params* input = malloc(sizeof(params));
 
@@ -131,30 +125,38 @@ int main(int argc, char** argv) {
     printf("Query caricate: nq=%d, D=%d\n", input->nq, input->D);
     printf("Thread OpenMP disponibili: %d\n", omp_get_max_threads());
 
-    // ========== ✅ TEST ASSEMBLY ==========
+    /*
+    *  TEST ASSEMBLY
+    *  Verifica che la funzione euclidean_distance_asm dia lo stesso risultato 
+    *  della versione C classica
+    */
     if (!input->silent) {
-        printf("\n[TEST] Verifica euclidean_distance_asm...\n");
+        printf("\nTEST ASSEMBLY\n");
+        // prende due vettori reali dal dataset
         type* v1 = &input->DS[0];
         type* v2 = &input->DS[input->D];
+
+        // calcola distanze in c e assembly
         type dist_c = euclidean_distance_c(v1, v2, input->D);
         type dist_asm = euclidean_distance_asm(v1, v2, input->D);
         printf("      Distanza C:   %.10f\n", dist_c);
         printf("      Distanza ASM: %.10f\n", dist_asm);
         printf("      Differenza:   %.2e\n", fabs(dist_c - dist_asm));
+
+        // calcola differenza
         if (fabs(dist_c - dist_asm) < 1e-9) {
-            printf("      ✅ TEST PASSED\n\n");
+            printf("TEST PASSED\n\n");
         } else {
-            printf("      ❌ TEST FAILED\n\n");
+            printf("TEST FAILED\n\n");
             exit(1);
         }
     }
-    // ======================================
+    // 
 
     double t;
     
-    // =========================================================
+    
     // FIT
-    // =========================================================
     t = omp_get_wtime();
     fit(input);
     t = omp_get_wtime() - t;
@@ -164,9 +166,8 @@ int main(int argc, char** argv) {
     else
         printf("%.3f\n", t);
 
-    // =========================================================
+
     // PREDICT
-    // =========================================================
     t = omp_get_wtime();
     predict(input);
     t = omp_get_wtime() - t;

@@ -2,11 +2,7 @@ section .text
 global euclidean_distance_asm
 
 euclidean_distance_asm:
-    ; Calling convention System V AMD64:
-    ; RDI = const double* v
-    ; RSI = const double* w
-    ; EDX = int D
-    ; Return: double in XMM0
+
 
     ; Inizializza accumulatore a zero
     vxorpd ymm0, ymm0, ymm0        ; ymm0 = [0.0, 0.0, 0.0, 0.0]
@@ -17,24 +13,24 @@ euclidean_distance_asm:
     jz .residual                    ; Se D < 4, salta al residuo
 
 .vector_loop:
-    ; Carica 4 double da v e w (32 byte = 4 × 8 byte)
+    ; Carica 4 double da v e w 
     vmovupd ymm1, [rdi]             ; ymm1 = v[i..i+3]
     vmovupd ymm2, [rsi]             ; ymm2 = w[i..i+3]
 
     ; Calcola differenza: diff = v - w
     vsubpd ymm1, ymm1, ymm2         ; ymm1 = v[i..i+3] - w[i..i+3]
 
-    ; Eleva al quadrato: diff² = diff * diff
-    vmulpd ymm1, ymm1, ymm1         ; ymm1 = diff²
+    ; Eleva al quadrato la differenza
+    vmulpd ymm1, ymm1, ymm1         ; ymm1 = diff^2
 
     ; Accumula nel sommatore
-    vaddpd ymm0, ymm0, ymm1         ; ymm0 += diff²
+    vaddpd ymm0, ymm0, ymm1         ; ymm0 += diff^2
 
-    ; Avanza puntatori di 32 byte (4 double)
-    add rdi, 32
-    add rsi, 32
+    
+    add rdi, 32                     ; Avanza di 32 byte 
+    add rsi, 32                     
 
-    ; Decrementa contatore e ripeti
+    ; Decrementa contatore e ripete
     dec eax
     jnz .vector_loop
 
@@ -49,8 +45,10 @@ euclidean_distance_asm:
     vmovsd xmm1, [rdi]              ; xmm1 = v[i]
     vmovsd xmm2, [rsi]              ; xmm2 = w[i]
     vsubsd xmm1, xmm1, xmm2         ; xmm1 = v[i] - w[i]
-    vmulsd xmm1, xmm1, xmm1         ; xmm1 = (v[i] - w[i])²
-    vaddsd xmm0, xmm0, xmm1         ; xmm0 += (v[i] - w[i])²
+    vmulsd xmm1, xmm1, xmm1         ; xmm1 = (v[i] - w[i])^2
+
+    ; Qui accumula direttamente in xmm0
+    vaddsd xmm0, xmm0, xmm1         ; xmm0 += (v[i] - w[i])^2
 
     ; Avanza puntatori di 8 byte (1 double)
     add rdi, 8
@@ -64,7 +62,7 @@ euclidean_distance_asm:
     ; Somma orizzontale dei 4 double in YMM0
     ; YMM0 = [a, b, c, d] → XMM0 = a+b+c+d
 
-    ; Estrai parte alta (128-bit superiori) in XMM1
+    ; Estrai parte alta (128 bit superiori) in XMM1
     vextractf128 xmm1, ymm0, 1      ; xmm1 = [c, d]
 
     ; Somma parte bassa e alta
@@ -77,6 +75,6 @@ euclidean_distance_asm:
     vsqrtsd xmm0, xmm0, xmm0        ; xmm0 = sqrt(sum)
 
     ; Pulisci stato AVX prima del return
-    vzeroupper                       ; ✅ CORRETTO (non 'vzerouppper')
+    vzeroupper                       
 
     ret

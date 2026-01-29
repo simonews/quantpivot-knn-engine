@@ -18,7 +18,7 @@ typedef struct{
 	int* id_nn;					// per ogni query point gli ID dei K-NN
 	MATRIX dist_nn;				// per ogni query point le distanze dai K-NN
 
-	// ADDED after christian's version
+	
 	uint8_t* DS_quantized_plus; 
 	uint8_t* DS_quantized_minus; 
 
