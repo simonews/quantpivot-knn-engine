@@ -1,10 +1,13 @@
-# Binary datasets and results
+# Binary datasets
 *.ds2
 
-# Generated result files
+# Generated results
 results_*
 distNN_*
 idNN_*
 
 # Build folders
 clean/
+
+# IDE
+.idea/
