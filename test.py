@@ -1,5 +1,5 @@
-import gruppoX
-import gruppoX.quantpivot32
+import gruppo11
+import gruppo11.quantpivot32
 
 import argparse
 import sys
@@ -107,11 +107,11 @@ if __name__ == "__main__":
     Q = load_file(args.Q, dtype=f'float{bits}', alignment=int(bits/2))
 
     if args.t == '32':
-        quantpivot = gruppoX.quantpivot32.QuantPivot()
+        quantpivot = gruppo11.quantpivot32.QuantPivot()
     elif args.t == '64':
-        quantpivot = gruppoX.quantpivot64.QuantPivot()
+        quantpivot = gruppo11.quantpivot64.QuantPivot()
     elif args.t == '64omp':
-        quantpivot = gruppoX.quantpivot64omp.QuantPivot()
+        quantpivot = gruppo11.quantpivot64omp.QuantPivot()
 
     # =========================
     start = time.time()

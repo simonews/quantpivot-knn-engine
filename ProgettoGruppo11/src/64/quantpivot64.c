@@ -227,8 +227,8 @@ void predict(params* input) {
     int* knn_ids = malloc(input->k * sizeof(int));
     type* knn_dists = malloc(input->k * sizeof(type));
 
-    printf("[DEBUG] Allocati knn_ids e knn_dists: k=%d, size_ids=%zu, size_dists=%zu\n",
-       input->k, input->k * sizeof(int), input->k * sizeof(type));
+    // printf("[DEBUG] Allocati knn_ids e knn_dists: k=%d, size_ids=%zu, size_dists=%zu\n",
+       // input->k, input->k * sizeof(int), input->k * sizeof(type));
     
     // Per ogni query
     for (int qi = 0; qi < input->nq; qi++) {
@@ -320,8 +320,8 @@ void predict(params* input) {
         }
 
         if (qi == input->nq - 1) {  // Ultima query
-            printf("[DEBUG] Ultima query: copiando risultati, qi=%d, offset=%d\n", 
-            qi, qi * input->k);
+            // printf("[DEBUG] Ultima query: copiando risultati, qi=%d, offset=%d\n", 
+            // qi, qi * input->k);
         }
         
         // Salva risultati

@@ -5,7 +5,7 @@ import numpy as np
 import glob
 import os
 
-gruppo='gruppoX'
+gruppo='gruppo11'
 
 class CustomBuildExt(build_ext):
     def run(self):
@@ -25,13 +25,13 @@ class CustomBuildExt(build_ext):
         # Aggiunge i file .o dinamicamente
         for ext in self.extensions:
             if '32' in ext.name:
-                obj_files = glob.glob('src/32/*.o')
+                obj_files = [f for f in glob.glob('src/32/*.o') if 'main.o' not in f]
                 ext.extra_objects = obj_files
             elif '64omp' in ext.name:
-                obj_files = glob.glob('src/64omp/*.o')
+                obj_files = [f for f in glob.glob('src/64omp/*.o') if 'main.o' not in f]
                 ext.extra_objects = obj_files
             elif '64' in ext.name:
-                obj_files = glob.glob('src/64/*.o')
+                obj_files = [f for f in glob.glob('src/64/*.o') if 'main.o' not in f]
                 ext.extra_objects = obj_files
         super().run()
 
@@ -39,30 +39,30 @@ module32 = Extension(
     f"{gruppo}.quantpivot32._quantpivot32",  # Nome completo del modulo
     sources=['src/32/quantpivot32_py.c'],
     include_dirs=[np.get_include()],
-    extra_compile_args=['-O0', '-msse', '-fPIC'],
-    extra_link_args=['-z', 'noexecstack']
+    extra_compile_args=['-m64', '-O2', '-march=native', '-msse3', '-Wall','-fPIC'],
+    extra_link_args=['-z', 'noexecstack', '-lm']
 )
 
 module64 = Extension(
     f"{gruppo}.quantpivot64._quantpivot64",  # Nome completo del modulo
     sources=['src/64/quantpivot64_py.c'],
     include_dirs=[np.get_include()],
-    extra_compile_args=['-O0', '-msse', '-mavx', '-fPIC'],
-    extra_link_args=['-z', 'noexecstack']
+    extra_compile_args=['-m64', '-O3', '-march=native', '-Wall', '-fPIC'],
+    extra_link_args=['-z', 'noexecstack', '-lm']
 )
 
 module64omp = Extension(
     f"{gruppo}.quantpivot64omp._quantpivot64omp",  # Nome completo del modulo
     sources=['src/64omp/quantpivot64omp_py.c'],
     include_dirs=[np.get_include()],
-    extra_compile_args=['-O0', '-msse', '-mavx', '-fPIC', '-fopenmp'],
-    extra_link_args=['-z', 'noexecstack', '-fopenmp']
+    extra_compile_args=['-m64', '-O3', '-march=native', '-mavx', '-Wall', '-fPIC', '-fopenmp'],
+    extra_link_args=['-z', 'noexecstack', '-lm', '-fopenmp']
 )
 
 setup(
     name=gruppo,
     version='1.0',
-    author="LISTA COMPONENTI GRUPPO",
+    author="ANDREA ATTADIA, VITO SIMONE GOFFREDO, CHRISTIAN IUELE",
     packages=find_packages(),  # Trova automaticamente i pacchetti
     ext_modules=[module32, module64, module64omp],
     cmdclass={'build_ext': CustomBuildExt},

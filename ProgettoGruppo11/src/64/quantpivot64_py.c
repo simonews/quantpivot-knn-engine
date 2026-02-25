@@ -180,6 +180,14 @@ static PyObject* QuantPivot64_predict(QuantPivot64Object *self, PyObject *args, 
 
 	// Estrae il flag silent
 	self->input->silent = silent;
+	
+	// aggiungo stesse modifiche della versione a 32 bit
+	self->input->Q = query;
+	
+	// riferimento all'array con INCREF
+	Py_INCREF(query_array);
+	Py_XDECREF(self->Q_array);
+	self->Q_array = query_array;
 
 	self->input->id_nn = (int*) _mm_malloc(self->input->nq * self->input->k * sizeof(int), align);
 	self->input->dist_nn = (type*) _mm_malloc(self->input->nq * self->input->k * sizeof(type), align);

@@ -1,0 +1,10 @@
+# Binary datasets and results
+*.ds2
+
+# Generated result files
+results_*
+distNN_*
+idNN_*
+
+# Build folders
+clean/

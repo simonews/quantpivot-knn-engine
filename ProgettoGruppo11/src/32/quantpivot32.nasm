@@ -1,49 +1,31 @@
 
-; Istruzioni: SSE/SSE2/SSE3 (128-bit registers)
-
-
-; FIX RISPETTO ALLA VERSIONE PRECEDENTE:
-; - Bug residui: usa XMM7 separato per accumulo scalare
-; - Somma orizzontale: haddps (SSE3) invece di FPU stack
-
 
 section .text
 global euclidean_distance_asm
 
 
-; float euclidean_distance_asm(const float* v, const float* w, int D)
-
-; Parametri (cdecl - stack):
-;   [ebp+8]  = const float* v   (primo parametro)
-;   [ebp+12] = const float* w   (secondo parametro)
-;   [ebp+16] = int D            (terzo parametro)
+; Parametri:
+;   RDI = const float* v   (primo parametro)
+;   RSI = const float* w   (secondo parametro)
+;   EDX = int D            (terzo parametro)
 ;
-; Return:
-;   ST(0) = float (FPU stack - convenzione 32-bit per float return)
-;
-; Registri salvati (callee-saved):
-;   ebx, esi, edi, ebp
+; Return: XMM0
 
-; INGRESSO FUNZIONE 
 
 euclidean_distance_asm:
     
-    ; FASE 0: salva registri e setup stack frame
+    ; FASE 0: setup stack frame
+    ; usa registri a 64 bit per push/pop 
 
-    push ebp ; base pointer del chiamante 
-    mov ebp, esp ; gli impostiamo l'attuale cima dello stack
-    ; salva i registri 
-    push ebx 
-    push esi
-    push edi
+    push rbp 
+    mov rbp, rsp 
+    
+    
     
     
     ; FASE 1: Inizializzazione
-    ; legge i parametri dallo stack
+    ; i parametri sono già in RDI, RSI, EDX
 
-    mov esi, [ebp+8]            ; ESI = puntatore a v
-    mov edi, [ebp+12]           ; EDI = puntatore a w
-    mov ecx, [ebp+16]           ; ECX = D
     
     xorps xmm0, xmm0            ; XMM0 = [0.0, 0.0, 0.0, 0.0] (somma vettoriale)
     xorps xmm7, xmm7            ; XMM7 = 0.0 (somma residui scalari)
@@ -52,27 +34,27 @@ euclidean_distance_asm:
     ; FASE 2: Loop vettoriale (processa 4 float per iterazione)
     ; calcola quante iterazioni "piene" da 4 elementi possiamo fare
 
-    mov eax, ecx                ; EAX = D
+    mov eax, edx                ; EAX = D
     shr eax, 2                  ; EAX = D / 4
     jz .residual                ; Se D < 4, salta al loop residuo
     
 .vector_loop:
     ; Carica 4 float da v e w (16 byte = 4 × 4 byte)
-    movups xmm1, [esi]          ; XMM1 = v[i..i+3]
-    movups xmm2, [edi]          ; XMM2 = w[i..i+3]
+    movups xmm1, [rdi]          ; carica puntatore RDI
+    movups xmm2, [rsi]          ; carica puntatore RSI
     
     ; Calcola differenza: diff = v - w
-    subps xmm1, xmm2            ; XMM1 = v[i..i+3] - w[i..i+3]
+    subps xmm1, xmm2            ; 
     
-    ; Eleva al quadrato: diff²
+    ; Eleva al quadrato: diff^2
     mulps xmm1, xmm1            ; XMM1 = (v[i] - w[i])^2
     
     ; Accumula nel sommatore
-    addps xmm0, xmm1            ; XMM0 += diff²
+    addps xmm0, xmm1            ; XMM0 += diff^2
     
     ; Avanza puntatori di 16 byte (4 float)
-    add esi, 16
-    add edi, 16
+    add rdi, 16
+    add rsi, 16
     
     ; Decrementa contatore e ripeti
     dec eax
@@ -83,22 +65,22 @@ euclidean_distance_asm:
     
 .residual:
     ; Calcola numero di elementi residui: eax = D mod 4
-    mov eax, ecx                ; EAX = D
+    mov eax, edx                ; EAX = D
     and eax, 3                  ; EAX = D & 0b11 = D mod 4
     jz .horizontal_sum          ; Se nessun residuo, vai alla somma
     
 .residual_loop:
     ; Processa 1 float alla volta (operazioni scalari)
-    movss xmm1, [esi]           ; XMM1 = v[i]
-    movss xmm2, [edi]           ; XMM2 = w[i]
+    movss xmm1, [rdi]           ; XMM1 = v[i]
+    movss xmm2, [rsi]           ; XMM2 = w[i]
     
     subss xmm1, xmm2            ; XMM1 = v[i] - w[i]
     mulss xmm1, xmm1            ; XMM1 = (v[i] - w[i])^2
     addss xmm7, xmm1            ; Accumulo scalare su XMM7 
     
     ; Avanza puntatori di 4 byte (1 float)
-    add esi, 4
-    add edi, 4
+    add rdi, 4
+    add rsi, 4
     
     ; Decrementa e ripeti
     dec eax
@@ -126,20 +108,8 @@ euclidean_distance_asm:
     sqrtss xmm0, xmm0           ; XMM0 = sqrt(sum)
     
     
-    ; FASE 6: Return in FPU stack (convenzione 32-bit per float)
-    
-    ; Nelle architetture x86 a 32 bit i valori di ritorno float o double NON vengono
-    ; restituiti nei registri xmm0 ma nel registro ST(0)
-    sub esp, 4                  ; Alloca spazio su stack
-    movss [esp], xmm0           ; Salva risultato su stack
-    fld dword [esp]             ; Carica dalla memoria allo stack FPU
-    add esp, 4                  ; Pulisci stack
-    
-    
-    ; FASE 7: ripristina registri e return
+    ; FASE 6 e 7: ripristina e returna
+    ; nelle architetture a 64 bit returniamo in XMM0
 
-    pop edi
-    pop esi
-    pop ebx
-    pop ebp
+    pop rbp
     ret

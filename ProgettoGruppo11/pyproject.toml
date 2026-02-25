@@ -3,10 +3,10 @@ requires = ["setuptools", "numpy"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = 'gruppoX'
+name = 'gruppo11'
 version = "1.0"
 authors = [
-    {name = "Il Tuo Nome", email = "tua@email.com"},
+    {name = "Andrea Attadia", email = "andreaattadia15@gmail.com"},
 ]
 description = "Quantized Index for K-NN search"
 readme = {file = "README.md", content-type = "text/markdown"}
